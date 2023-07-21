@@ -1,6 +1,5 @@
-
 CFLAGS=-Wall -O2
 CC=gcc
 
 
-all: minidmx
+all: minidmx setdmx

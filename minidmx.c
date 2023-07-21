@@ -1,9 +1,8 @@
-
-// testbaud.c  compile with 
-// gcc -Wall -O2 testbaud.c -o testbaud
+// minidmx.c  compile with 
+// gcc -Wall -O2 minidmx.c -o minidmx
 // 
 // run with 
-// ./testbaud < /dev/ttyAMA0
+// ./minidmx 
 //
 
 #include <stdio.h>
@@ -13,15 +12,17 @@
 //  sys/ioctl clashes with asm/termios. That one is required, this just generates a warning. 
 //#include <sys/ioctl.h>
 #include <asm/termbits.h>
+#include <sys/mman.h>
 #include <errno.h>
 #include <asm/termios.h>
 #include <unistd.h>
 #include <fcntl.h>
 
 
-#define DMXSIZE 64
+#define DMXSIZE 512
 
-unsigned char buf[DMXSIZE+1];
+//unsigned char dmx[DMXSIZE+1];
+unsigned char *dmx;
 
 int led=1; 
 
@@ -98,11 +99,12 @@ int setup_dmx_uart (char *port)
   } else {
     printf ("Port speeds are %d/%d\n" , tio.c_ispeed,  tio.c_ospeed );
   }
-  buf [0] = 0;
+  dmx [0] = 0;
   return fd;
 }
 
-void send_dmx_frame (int fd, unsigned char *buf)
+
+void send_dmx_frame (int fd, unsigned char *dmx)
 {
   if (ioctl(fd, TIOCSBRK, NULL) < 0) {
     printf (" ioctl() failed");
@@ -114,25 +116,67 @@ void send_dmx_frame (int fd, unsigned char *buf)
     exit (1);
   }
   usleep (100);
-  if (write (fd, buf, DMXSIZE+1) < DMXSIZE) 
+  if (write (fd, dmx, DMXSIZE+1) < DMXSIZE) 
     perror ("write");
 }
+
+
+void fatal (char *msg)
+{
+  perror (msg);
+  exit (1);
+}
+
+
+unsigned char *open_universe_file (char *fname)
+{
+  int fd; 
+  unsigned char *tmpdmx;
+
+  fd = open(fname, O_RDWR);
+  if (fd < 0) { // help the user: create the universe file.
+     fd = open(fname, O_RDWR  | O_CREAT, 0666);
+     if (fd < 0) fatal (fname);
+     tmpdmx = malloc (4096);
+     write (fd, tmpdmx, 4096);
+     free (tmpdmx);
+     tmpdmx = NULL;
+  }
+
+  tmpdmx = mmap (NULL, 513, PROT_READ | PROT_WRITE, MAP_SHARED, fd, 0);
+  if (tmpdmx ==  (void *)-1) fatal ("mmap"); 
+  tmpdmx[0] = 0;
+  return tmpdmx;
+}
+
+
+
+
 
 
 int main (int argc, char **argv)
 {
   int fd = 0;
+  int test = 0;
 //  char *port = argv[1];
 //  char *port = NULL;
 
   if (argc > 1) led = atoi (argv[1]);
+
+  if (test) {
+     dmx = malloc (DMXSIZE+1); 
+  } else {
+     dmx = open_universe_file ("dmx_universe"); 
+  }
+
+
   fd = setup_dmx_uart (NULL);
 
   while (1) {
-    send_dmx_frame (fd, buf);
-    update_dmx_universe (buf);
-    usleep (15000);
-
+    send_dmx_frame (fd, dmx);
+    if (test)
+       update_dmx_universe (dmx);
+    usleep (25000);
   }
   exit (0); 
 }
