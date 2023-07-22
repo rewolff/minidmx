@@ -1,4 +1,9 @@
-// minidmx.c  compile with 
+// (C) BitWizard B.V.
+// written by R.E.Wolff@BitWizard.nl
+// GPL v2.0 applies
+//
+// ** minidmx.c **  
+// compile with 
 // gcc -Wall -O2 minidmx.c -o minidmx
 // 
 // run with 

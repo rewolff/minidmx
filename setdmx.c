@@ -1,3 +1,6 @@
+// (C) BitWizard B.V.
+// written by R.E.Wolff@BitWizard.nl
+// GPL v2.0 applies
 // setdmx.c  compile with 
 // gcc -Wall -O2 setdmx.c -o setdmx
 // 
