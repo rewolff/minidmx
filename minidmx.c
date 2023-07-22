@@ -8,7 +8,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-//#include <stropts.h>
+#include <stropts.h>
 //  sys/ioctl clashes with asm/termios. That one is required, this just generates a warning. 
 //#include <sys/ioctl.h>
 #include <asm/termbits.h>
@@ -21,8 +21,8 @@
 
 #define DMXSIZE 512
 
-//unsigned char dmx[DMXSIZE+1];
 unsigned char *dmx;
+int dbg=1;
 
 int led=1; 
 
@@ -54,6 +54,14 @@ void update_dmx_universe (unsigned char *dmx)
 
 }
 
+
+void fatal (char *msg)
+{
+  perror (msg);
+  exit (1);
+}
+
+
 int setup_dmx_uart (char *port) 
 {
   static const int rate = 250000;
@@ -64,16 +72,10 @@ int setup_dmx_uart (char *port)
     port = "/dev/ttyAMA0";
   }
   fd = open (port, O_RDWR);
-  if (fd < 0) {
-    perror (port);
-    exit (1);
-  }
+  if (fd < 0) fatal (port);
 
-  if (ioctl(fd, TCGETS2, &tio) < 0) {
-    printf  ("Failed to get current serial port settings");
-    exit (1);
-  }
-  printf ("Port speeds before change %d/%d\n" , tio.c_ispeed,  tio.c_ospeed );
+  if (ioctl(fd, TCGETS2, &tio) < 0) fatal ("ioctl tcgets");
+  if (dbg > 0) printf ("Port speeds before change %d/%d\n" , tio.c_ispeed,  tio.c_ospeed );
 
   tio.c_cflag |= CLOCAL;    // port is local, no flow control
   tio.c_cflag &= ~CSIZE;
@@ -82,50 +84,28 @@ int setup_dmx_uart (char *port)
   tio.c_cflag |= CSTOPB;    // 2 stop bit for DMX
   tio.c_cflag &= ~CRTSCTS;  // no CTS/RTS flow control
 
-
   tio.c_cflag &= ~CBAUD;
   tio.c_cflag |= BOTHER;
   tio.c_ispeed = rate;
   tio.c_ospeed = rate;  // set custom speed directly
 
-  if (ioctl(fd, TCSETS2, &tio) < 0) {
-    printf ("Failed to update serial port settings");
-    exit (1);
-  }
-
-  if (ioctl(fd, TCGETS2, &tio) < 0) {
-    printf ("Error getting altered settings from port");
-    exit (1);
-  } else {
-    printf ("Port speeds are %d/%d\n" , tio.c_ispeed,  tio.c_ospeed );
-  }
-  dmx [0] = 0;
+  if (ioctl(fd, TCSETS2, &tio) < 0) fatal ("ioctl tcsets");
+  if (ioctl(fd, TCGETS2, &tio) < 0) fatal ("ioctl tcgets2");
+  if (dbg > 0) printf ("Port speeds are %d/%d\n" , tio.c_ispeed,  tio.c_ospeed );
   return fd;
 }
 
 
+
 void send_dmx_frame (int fd, unsigned char *dmx)
 {
-  if (ioctl(fd, TIOCSBRK, NULL) < 0) {
-    printf (" ioctl() failed");
-    exit (1);
-  }
+  if (ioctl(fd, TIOCSBRK, NULL) < 0) fatal ("ioctl(SBRK) failed");
   usleep (100);
-  if (ioctl(fd, TIOCCBRK, NULL) < 0) {
-    printf (" ioctl() failed");
-    exit (1);
-  }
-  usleep (100);
-  if (write (fd, dmx, DMXSIZE+1) < DMXSIZE) 
-    perror ("write");
+  if (ioctl(fd, TIOCCBRK, NULL) < 0) fatal ("ioctl(CBRK) failed");
+  usleep (8);
+  if (write (fd, dmx, DMXSIZE+1) < DMXSIZE) perror ("write");
 }
 
-
-void fatal (char *msg)
-{
-  perror (msg);
-  exit (1);
-}
 
 
 unsigned char *open_universe_file (char *fname)
@@ -137,7 +117,7 @@ unsigned char *open_universe_file (char *fname)
   if (fd < 0) { // help the user: create the universe file.
      fd = open(fname, O_RDWR  | O_CREAT, 0666);
      if (fd < 0) fatal (fname);
-     tmpdmx = malloc (4096);
+     tmpdmx = calloc (4096, 1);
      write (fd, tmpdmx, 4096);
      free (tmpdmx);
      tmpdmx = NULL;
@@ -168,7 +148,6 @@ int main (int argc, char **argv)
   } else {
      dmx = open_universe_file ("dmx_universe"); 
   }
-
 
   fd = setup_dmx_uart (NULL);
 
