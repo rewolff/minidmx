@@ -1,0 +1,2 @@
+#!/bin/sh
+echo "This project doesn't require a configure. Go ahead an type make now."

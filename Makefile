@@ -1,7 +1,7 @@
 CFLAGS=-Wall -O2
 CC=gcc
 
-PROGS=minidmx setdmx
+PROGS=minidmx setdmx print_universe
 
 all: $(PROGS)
 
